@@ -1,163 +1,124 @@
-import requests
-import json
-import html
-import openpyxl
-import pyodbc
-from datetime import datetime
-import locale
-from datetime import date
-import calendar
-from html import escape
-import pandas as pd
+# ############################################################################################################################
+#                                                                                                                            #
+#                                                                                                                            #
+#                               ROBÔ PARA MONITORAR OP. ASSISTIDA v1.4.0 powered by Leandro Freitas                          #
+#                                                                                                                            #
+#                                                                                                                            #
+# ############################################################################################################################
 
-locale.setlocale(locale.LC_ALL, 'pt_BR.utf-8')
+# ... (código anterior)
 
-# ...
+# Definir as cores do farol
+cor_verde = "🟢"
+cor_amarelo = "🟡"
+cor_vermelho = "🔴"
 
-# Lista de gercreds
-gercreds = ['gercred001', 'gercred002', 'gercred003', 'gercred004', 'gercred005']
+# Definir os limites para as cores do farol
+limite_verde = 0
+limite_amarelo = 3
+# qualquer coisa diferente é vermelho
 
-# Dicionário de webhooks correspondentes aos gercreds
-webhooks = {
-    'gercred001': 'URL_WEBHOOK_001',
-    'gercred002': 'URL_WEBHOOK_002',
-    'gercred003': 'URL_WEBHOOK_003',
-    'gercred004': 'URL_WEBHOOK_004',
-    'gercred005': 'URL_WEBHOOK_005',
+# Obter a quantidade da variável 'formatted_result'
+# quantidade = int(formatted_result.split(":")[1].split("<br>")[0])
+quantidade = int(formatted_result3.split(":")[1].split("<br>")[0].replace('</b> ', ''))
+
+# Escolher a cor do farol com base na quantidade
+if quantidade <= limite_verde:
+    cor_farol = cor_verde
+elif quantidade <= limite_amarelo:
+    cor_farol = cor_amarelo
+else:
+    cor_farol = cor_vermelho
+
+# Formatar o resultado da consulta
+
+# formatted_result2 = ""
+# for row in cursor2:
+#     formatted_result += f"<b>Total de pedidos Recebidos :</b> {str(row[0][0])}<br><b>Valor total de pedidos Recebidos:</b> {str(row[0][1])}<br><br><b>Total de pedidos Faturados :</b> {str(row[1][0])}<br><b>Valor total de pedidos Faturados:</b> {str(row[1][1])}<br><br>"
+
+formatted_result2 = ""
+rows = list(cursor2)
+
+# Primeira linha da matriz
+formatted_result2 += f"<b>Total de pedidos Recebidos :</b> {str(rows[0][0])}<br><b>Valor total de pedidos Recebidos:</b> {str(rows[0][1])}<br><br>"
+
+# Segunda linha da matriz
+formatted_result2 += f"<b>Total de pedidos Faturados :</b> {str(rows[1][0])}<br><b>Valor total de pedidos Faturados:</b> {str(rows[1][1])}<br><br>"
+
+# Mensagem a ser enviada, neste caso utilizando HTML
+message = {
+    "cards": [
+        {
+            "sections": [
+                {
+                    "widgets": [
+                        {
+                            "image": {
+                                "imageUrl": "https://images2.imgbox.com/62/3b/QJezuElt_o.png"
+                            }
+                        },
+                        {
+                            "textParagraph": {
+                                "text": f'<b><font color="#00FA9A"><h3>Relatório de Pedidos - {seller}</h3></font>',
+                            }
+                        },
+                    ]
+                },
+                {
+                    "widgets": [
+                        {
+                            "textParagraph": {
+                                "text": f"Informação atualizada dos pedidos até o dia <b>{data_formatada}:"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "widgets": [
+                        {
+                            "textParagraph": {
+                                "text": f"{formatted_result}",
+                            }
+                        }
+                    ]
+                },
+                {
+                    "widgets": [
+                        {
+                            "textParagraph": {
+                                "text": f"{cor_farol} -  {formatted_result3}",
+                            }
+                        }
+                    ]
+                },
+                {
+                    "widgets": [
+                        {
+                            "textParagraph": {
+                                "text": formatted_result2,
+                            }
+                        }
+                    ]
+                },
+                {
+                    "widgets": [
+
+                    ]
+                },
+                {
+                    "widgets": [
+                        {
+                            "textParagraph": {
+                                "text": f'Caso queira ter acesso ao relatorio detalhado dos pedidos, <a href="{planilha}">clique aqui</a>'
+                            }
+                        }
+                    ]
+
+                }
+            ]
+        }
+    ]
 }
 
-for gercred in gercreds:
-    # ...
+# ... (código restante)
 
-    # Substituir 'GERCRED40' pela variável gercred
-    result1 = """
-    DECLARE @AgreementName VARCHAR(12) = '{}'
-    DECLARE @DataInicio VARCHAR(16) = '{}'
-    select 
-    count(1) as 'Quantidade',
-    case 
-    when SUM(Amount) is null then 'Sem pedidos pendentes'
-    else FORMAT(SUM(Amount) ,'c', 'pt-br') 
-    end as "valor"
-    from VW_Authorization va1 with (nolock) where AuthorizationId in 
-    (
-    select va.AuthorizationId from VW_Authorization va 
-    where 1=1
-    AND va.AgreementName = '{}'
-    and va.SellerId = @AgreementName
-    EXCEPT 
-    select AuthorizationId from Invoices i with (nolock)
-    where 1=1
-    AND i.AgreementName = '{}'
-    and i.ProcessResult  = 1
-    and i.SellerName = @AgreementName
-    )
-    and va1.AuthorizationResult  = 'Approved'
-    and va1.CreatedAt > @DataInicio
-    """.format(gercred, DataInicio, gercred, gercred)
-
-    # ...
-
-    # Substituir 'GERCRED40' pela variável gercred
-    result2 = """
-    DECLARE @AgreementName VARCHAR(12) = '{}'
-    DECLARE @DataInicio VARCHAR(16) = '{}'
-        SELECT COUNT(va.AuthorizationId), 
-        case 
-    when SUM(Amount) is null then 'Sem pedidos'
-    else FORMAT(SUM(Amount) ,'c', 'pt-br')
-    end as 'Valor'
-         FROM VW_Authorization va WITH (NOLOCK)
-         WHERE CreditReasonId = 1
-         AND va.AgreementName ='{}'
-         AND va.SellerId = @AgreementName
-         AND va.CreatedAt > @DataInicio 
-         union all 
-    SELECT COUNT(va.Id), 
-    case 
-    when SUM(Amount) is null then 'Sem Faturamentos '
-    else FORMAT(SUM(Amount) ,'c', 'pt-br')   
-    end as 'Valor'
-         FROM Invoices VA WITH (NOLOCK)
-         WHERE ProcessResult = 1
-         AND va.sellerName = @AgreementName
-         AND va.AgreementName ='{}'
-         AND va.CreatedAt > @DataInicio
-    """.format(gercred, DataInicio, gercred, gercred)
-
-    # ...
-
-    # Substituir 'GERCRED40' pela variável gercred
-    sql_query = """
-    DECLARE @AgreementName VARCHAR(12) = '{}'
-    DECLARE @DataInicio VARCHAR(16) = '{}'
-    SELECT 'Pedidos Não Recebidos' as 'Tipo',
-           document as 'CNPJ Cliente',
-           '-' as 'CNPJ Emissor',
-           Format(amount, 'c', 'pt-br'),
-           referencecode as 'Numero do Pedido',
-           '-'                             AS 'Numero Nota fiscal',
-           createdat as 'Data de criação',
-           CONVERT(VARCHAR, expiresat, 20) AS 'DATA EXPIRAÇÃO'
-    FROM   vw_authorization va1
-    WHERE  authorizationid IN (SELECT va.authorizationid
-                               FROM   vw_authorization va
-                               WHERE  sellerid = @AgreementName
-                               EXCEPT
-                               SELECT authorizationid
-                               FROM   invoices i WITH (nolock)
-                               WHERE  i.sellername = @AgreementName
-                                      AND i.processresult = 1)
-           AND va1.authorizationresult = 'Approved'
-           AND va1.agreementname = '{}'
-           AND va1.createdat > @DataInicio
-    UNION ALL
-    SELECT 'Pedidos'                       AS 'Tipo',
-           document                        AS 'CNPJ Cliente',
-           '-',
-           Format(amount, 'c', 'pt-br')    AS 'Valor',
-           referencecode                   AS 'Numero do Pedido',
-           '-'                             AS 'Numero Nota fiscal',
-           createdat                       AS 'Data de criação',
-           CONVERT(VARCHAR, expiresat, 20) AS 'Data Expiração'
-    FROM   vw_authorization va WITH (nolock)
-    WHERE  creditreasonid = 1
-           AND va.agreementname = '{}'
-           AND va.sellerid = @AgreementName
-           AND va.createdat > @DataInicio
-    UNION ALL
-    SELECT 'Operações',
-           i.receiverdocument             AS 'CNPJ Cliente',
-           CONVERT(VARCHAR, i.IssuerDocument, 20)			  as 'CNPJ Emissor',
-           Format(i.amount, 'c', 'pt-br') AS 'Valor',
-           va2.referencecode,
-           i.number                       AS 'Numero da Nota',
-           i.createdat                    AS 'Data de criação',
-           '-'
-    FROM   invoices i WITH (nolock),
-           vw_authorization va2
-    WHERE  i.authorizationid = va2.authorizationid
-           AND i.processresult = 1
-           AND i.sellername = @AgreementName
-           AND i.createdat > @DataInicio
-           AND i.agreementname = '{}'
-    """.format(gercred, DataInicio, gercred)
-
-    # ...
-
-    # Substituir 'GERCRED40' pela variável gercred
-    resultPend1 = """
-    DECLARE @AgreementName VARCHAR(12) = '{}'
-    select 
-     count(1) as 'Quantidade'
-    from VW_Authorization va1 with (nolock) where AuthorizationId in 
-    (
-    select va.AuthorizationId from VW_Authorization va 
-    where 1=1
-    AND va.AgreementName ='{}'
-    and va.SellerId = @AgreementName
-    EXCEPT 
-    select AuthorizationId from Invoices i with (nolock)
-    where 1=1
-    AND i.AgreementName ='{}'
-    and i.ProcessResult 
